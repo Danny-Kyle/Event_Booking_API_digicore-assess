@@ -1,0 +1,28 @@
+Domain models
+- Event
+- Booking
+- Event status
+
+Repositories
+- booking repo
+- Event repo
+
+Dtos
+- event req
+- booking req
+
+exceptions
+- resource not found
+- bad request
+
+services
+- event
+- booking
+
+Core Business Logic 
+- Date Validation
+- Capacity guards
+- status guards
+
+Storage choice 
+- H2 DB
