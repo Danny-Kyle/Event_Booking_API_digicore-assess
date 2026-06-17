@@ -17,7 +17,14 @@ exceptions
 
 services
 - event
-- booking
+- booking services
+    - verify event exists
+    - cannot book if status is closed
+    - cannot book if event has no remaining Capacity
+    - same email cannot book the same event more than once
+    - create and save the new booking record
+    - increase booked seats count
+    - auto set event status to closed when fully booked
 
 Core Business Logic 
 - Date Validation
