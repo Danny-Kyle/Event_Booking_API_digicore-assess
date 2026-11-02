@@ -47,14 +47,14 @@ public class BookingServiceTest {
         openEvent.setId(1L);
 
         bookingRequest = new BookingRequest();
-        bookingRequest.setAttendeeEmail("chidiebubeokechukwu21@gmail.com");
-        bookingRequest.setAttendeeName("Okechukwu Daniel");
+        bookingRequest.setAttendeeEmail("john@example.com");
+        bookingRequest.setAttendeeName("John Doe");
     }
 
     @Test
     void createBooking_ThrowsBadRequest_WhenEventClosed(){
         openEvent.setStatus(EventStatus.CLOSED);
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(openEvent));
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(openEvent));
 
         assertThrows(BadRequestException.class, () -> bookingService.createBooking(bookingRequest, 1L));
         verify(bookingRepository, never()).save(any());
@@ -63,15 +63,15 @@ public class BookingServiceTest {
     @Test
     void createBooking_ThrowsBadRequest_WhenFullyBooked() {
         openEvent.setBookedSeats(5); // maxed capacity out
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(openEvent));
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(openEvent));
 
         assertThrows(BadRequestException.class, () -> bookingService.createBooking(bookingRequest, 1L));
     }
 
     @Test
     void createBooking_ThrowsBadRequest_WhenDuplicateEmail() {
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(openEvent));
-        when(bookingRepository.existsByEventIdandAttendeeEmail(1L, "john@example.com")).thenReturn(true);
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(openEvent));
+        when(bookingRepository.existsByEventIdAndAttendeeEmail(1L, "john@example.com")).thenReturn(true);
 
         assertThrows(BadRequestException.class, () -> bookingService.createBooking(bookingRequest, 1L));
     }
@@ -81,8 +81,8 @@ public class BookingServiceTest {
         openEvent.setTotalSeats(1);
         openEvent.setBookedSeats(0);
 
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(openEvent));
-        when(bookingRepository.existsByEventIdandAttendeeEmail(1L, "john@example.com")).thenReturn(false);
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(openEvent));
+        when(bookingRepository.existsByEventIdAndAttendeeEmail(1L, "john@example.com")).thenReturn(false);
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         bookingService.createBooking(bookingRequest, 1L);
@@ -97,10 +97,11 @@ public class BookingServiceTest {
         booking.setId(10L);
         openEvent.setBookedSeats(1);
 
+        when(bookingRepository.findEventIdById(10L)).thenReturn(Optional.of(1L));
         when(bookingRepository.findById(10L)).thenReturn(Optional.of(booking));
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(openEvent));
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(openEvent));
 
-        bookingService.CancelBooking(10L);
+        bookingService.cancelBooking(10L);
 
         assertEquals(0, openEvent.getBookedSeats());
         verify(bookingRepository, times(1)).delete(booking);

@@ -17,6 +17,7 @@ public class Event {
     private String venue;
     private int totalSeats;
     private int bookedSeats;
+    @Enumerated(EnumType.STRING)
     private EventStatus status = EventStatus.OPEN;
 
     public Event(){}

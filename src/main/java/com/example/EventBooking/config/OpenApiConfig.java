@@ -15,6 +15,6 @@ public class OpenApiConfig {
         .info(new Info()
         .title("Event Booking REST API")
             .version("1.1.0")
-            .description("Backend service to manage event creating, scheduling and track seat capacity amongst other things...."));
+            .description("Create events, reserve seats, cancel bookings, and browse paginated events and bookings."));
     }
 }

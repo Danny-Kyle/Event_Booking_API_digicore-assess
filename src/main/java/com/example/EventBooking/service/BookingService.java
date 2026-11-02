@@ -1,6 +1,7 @@
 package com.example.EventBooking.service;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +28,7 @@ public class BookingService {
 
     @Transactional
     public Booking createBooking(BookingRequest request, Long eventId){
-        Event event = eventRepository.findById(eventId)
+        Event event = eventRepository.findByIdForUpdate(eventId)
                                     .orElseThrow(() -> new ResourceNotFoundException("Event with id " +eventId +" not found"));
         
         if (event.getStatus() == EventStatus.CLOSED) {
@@ -38,7 +39,7 @@ public class BookingService {
             throw new BadRequestException("Cannot book seat, this event is fully booked!");
         }
 
-        if(bookingRepository.existsByEventIdandAttendeeEmail(eventId, request.getAttendeeEmail())){
+        if(bookingRepository.existsByEventIdAndAttendeeEmail(eventId, request.getAttendeeEmail())){
             throw new BadRequestException("This email has already been used to book a seat for this event!");
         }
 
@@ -60,12 +61,16 @@ public class BookingService {
     }
 
     @Transactional
-    public void CancelBooking(Long bookingId) {
-        //check that the booking exists
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new ResourceNotFoundException("Booking with id: " +bookingId + " does not exist!"));
+    public void cancelBooking(Long bookingId) {
+        Long eventId = bookingRepository.findEventIdById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking with id: " + bookingId + " does not exist!"));
 
-        //check for the corresponding event
-        Event event = eventRepository.findById(booking.getEventId()).orElseThrow(()-> new ResourceNotFoundException("No associated events were found for this booking!!!"));
+        // Both creation and cancellation lock the event first. Load the booking
+        // after the lock so two cancellations cannot decrement the same seat twice.
+        Event event = eventRepository.findByIdForUpdate(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("No associated event was found for this booking"));
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking with id: " + bookingId + " does not exist!"));
 
         //delete the booking record
         bookingRepository.delete(booking);
@@ -82,12 +87,12 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public List<Booking> getBookingsByEventId(Long eventId){
+    public Page<Booking> getBookingsByEventId(Long eventId, Pageable pageable){
         //verify the event exists
         if(!eventRepository.existsById(eventId)){
             throw new ResourceNotFoundException("Event with id: " + eventId + " not found!");
         }
-        return bookingRepository.findbyEventId(eventId);
+        return bookingRepository.findByEventId(eventId, pageable);
     }
 }
 

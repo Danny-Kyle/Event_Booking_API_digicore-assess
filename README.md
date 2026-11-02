@@ -1,85 +1,157 @@
 # Event Booking REST API
 
-A robust, lightweight backend RESTful service built with Spring Boot to handle event management and attendee seat bookings.
-This application utilizes an in-memory database configuration with strict business constraint validation layers to manage concurrent operations, handle capacity caps, and enforce idempotency rules.
+A backend API for creating events, reserving seats, cancelling bookings, and viewing events and attendees. Built for the Digicore developer assessment.
 
-## Tech Stack
-- **Language** Java 17+
-- **Framework:** Spring Boot 3.x (Web, Data JPA, Validation)
-- **Database:** H2 Database Engine (In-Memory)
-- **Documentation:** OpenAPI / Swagger UI 3 (via Springdoc)
-- **Build Engine:** Maven
+## Technology
 
----
+- Java 21 or newer (JDK required)
+- Spring Boot 3.4.3, Spring Web, Spring Data JPA, Jakarta Validation
+- H2 in-memory database
+- Maven (wrapper included)
+- Springdoc OpenAPI / Swagger UI
+- JUnit 5, Mockito, and Spring Boot integration tests
 
-## Design Decisions & Assumptions
-1. **Layered Architecture:** The codebase follows a clean 3-tier architecture (Controller ➔ Service ➔ Repository) utilizing explicit Data Transfer Objects (DTOs) to isolate incoming data constraints from persistent schema entities.
-2. **H2 Over In-Memory Collections:** Selecting H2 Database via JPA over traditional in-memory HashMaps drastically drops boilerplate structural sync code, provides effortless standard schema definitions, and satisfies the assignment's technical bonus objective.
-3. **Data Integrity Guardrails:** Service methods are annotated with `@Transactional` to guarantee that atomic business cycles (e.g., executing a user booking record and safely bumping up the current seat counters on the event tracking tables) never finish partial execution during mid-runtime interruptions.
-4. **Automatic Lifecycles:** As a bonus option constraint, when a new booking takes the final vacant slot, the API safely forces the event status to `CLOSED`. Reversely, if a slot gets cancelled later, it scales the tracking flags straight back to `OPEN`.
+## Build, test, and run
 
----
+Set `JAVA_HOME` to your JDK installation. From the project root on Windows:
 
-## Architecture Flow Overview
-`Client/Swagger` ➔ `Validation Check (DTO)` ➔ `Service Constraints Engine` ➔ `H2 Storage Layer`
-
----
-
-## Setting Up and Running the Application
-
-### 1. Build the Project
-Ensure you have Maven installed. Run the command inside the root folder:
-```bash
-mvn clean package
-
+```powershell
+.\mvnw.cmd clean verify
+.\mvnw.cmd spring-boot:run
 ```
 
-### 2. Launch the Application
-
-Run the executable Spring Boot package via your terminal console:
+On macOS or Linux:
 
 ```bash
-mvn spring-boot:run
-
+./mvnw clean verify
+./mvnw spring-boot:run
 ```
 
-The application will boot up and begin listening to web traffic requests on default port `8080`.
+Alternatively, use an installed Maven with `mvn clean verify` and `mvn spring-boot:run`.
+After building, you can also run `java -jar target/EventBooking-0.0.1-SNAPSHOT.jar`.
+The Maven wrapper downloads Maven on its first run; dependency downloads require internet access.
 
----
+The API listens at `http://localhost:8080`.
 
-## Access Points & Visual Portals
+- [Swagger UI](http://localhost:8080/swagger-ui/index.html): all endpoints, request/response schemas, and interactive requests.
+- [OpenAPI JSON](http://localhost:8080/v3/api-docs)
+- [H2 console](http://localhost:8080/h2-console): JDBC URL `jdbc:h2:mem:eventdb`, username `sa`, empty password.
 
-### 🚀 API Playground (Swagger UI)
+The H2 database is in memory: restarting the application clears all events and bookings.
 
-Once launched, open up your web browser tracking address to visually test endpoints:
+## Endpoints
 
-* **Swagger URL:** [http://localhost:8080/swagger-ui/index.html](https://www.google.com/search?q=http://localhost:8080/swagger-ui/index.html)
+| Method | Path | Success | Purpose |
+| --- | --- | --- | --- |
+| POST | `/events` | 201 | Create an event |
+| GET | `/events` | 200 | List events with pagination |
+| GET | `/events/{id}` | 200 | Get an event |
+| POST | `/events/{id}/bookings` | 201 | Book one seat |
+| GET | `/events/{id}/bookings` | 200 | List bookings with pagination |
+| DELETE | `/bookings/{id}` | 204 | Cancel a booking and free its seat |
 
-### 📊 In-Memory Database Console
+Missing events and bookings return HTTP 404. Invalid input, duplicate bookings, closed events, and exhausted capacity return HTTP 400. Cancellation returns an empty response body.
 
-Access the live underlying database records via the H2 graphics panel layout:
+### Create an event
 
-* **H2 Portal URL:** [http://localhost:8080/h2-console](https://www.google.com/search?q=http://localhost:8080/h2-console)
-* **JDBC URL to enter:** `jdbc:h2:mem:eventdb`
-* **Username:** `sa`
-* **Password:** *(Leave completely blank)*
+`POST /events`, with `Content-Type: application/json`:
 
----
-
-## API Endpoints Reference
-
-### Events Endpoint Tree
-
-* `POST /events` - Registers a new scheduling entry *(Requires future date and total seats > 0)*
-* `GET /events` - Lists all tracking events saved in system memory.
-* `GET /events/{id}` - Extracts comprehensive detail stats for a specific event entry.
-
-### Bookings Endpoint Tree
-
-* `POST /events/{id}/bookings` - Registers an attendee slot reservation *(Blocks closed, sold-out, or duplicate email requests)*
-* `GET /events/{id}/bookings` - Pulls historical audit lists of attendees for the event block.
-* `DELETE /bookings/{id}` - Releases a reservation block and un-allocates the occupied seat capacity.
-
+```json
+{
+  "title": "Developer Conference",
+  "description": "An event for backend developers",
+  "date": "2099-06-20T10:00:00",
+  "venue": "Lagos",
+  "totalSeats": 2
+}
 ```
 
+The date must be in the future when the request is made. Title and venue must not be blank, and capacity must be at least 1. Description is optional.
+
+Example response (HTTP 201):
+
+```json
+{
+  "id": 1,
+  "title": "Developer Conference",
+  "description": "An event for backend developers",
+  "date": "2099-06-20T10:00:00",
+  "venue": "Lagos",
+  "totalSeats": 2,
+  "bookedSeats": 0,
+  "status": "OPEN"
+}
 ```
+
+### Book a seat
+
+`POST /events/1/bookings`:
+
+```json
+{
+  "attendeeName": "Alex Doe",
+  "attendeeEmail": "alex@example.com"
+}
+```
+
+Example response (HTTP 201; IDs and booking time are generated):
+
+```json
+{
+  "id": 1,
+  "eventId": 1,
+  "attendeeName": "Alex Doe",
+  "attendeeEmail": "alex@example.com",
+  "bookedAt": "2026-11-02T16:00:00"
+}
+```
+
+Both attendee fields are required and the email must be valid. Each booking reserves exactly one seat. A duplicate email on the same event is rejected. Emails are compared exactly, including letter case; `Alex@example.com` and `alex@example.com` are different. The same email may book different events, and may book the same event again after cancellation.
+
+### Pagination
+
+Both list endpoints accept `page` (zero-based, default `0`) and `size` (default `20`, between `1` and `100`). Results are ordered by ascending ID. Negative pages, invalid sizes, and non-numeric values return HTTP 400. A page beyond the last page returns empty `content` with the total counts.
+
+Examples: `GET /events?page=0&size=10` and `GET /events/1/bookings?page=0&size=10`.
+
+The list response is a pagination object (rather than the earlier bare array):
+
+```json
+{
+  "content": [],
+  "page": 0,
+  "size": 10,
+  "totalElements": 0,
+  "totalPages": 0
+}
+```
+
+`content` contains the event or booking objects shown above.
+
+### Error responses
+
+```json
+{
+  "timestamp": "2026-11-02T16:00:00",
+  "status": 404,
+  "error": "Not Found",
+  "message": "Event not found with id: 999",
+  "errors": {}
+}
+```
+
+Validation errors use the same structure with status `400`, message `Validation failed`, and field messages in `errors`. Malformed JSON, invalid field types, and invalid path/query values also return HTTP 400.
+
+## Design decisions
+
+- Controllers handle HTTP and annotation validation; services enforce booking rules; repositories handle H2 persistence.
+- New events start `OPEN` with zero booked seats. Taking the last seat closes the event. Cancelling a booking reopens it when capacity becomes available.
+- Booking and cancellation run in transactions and acquire a pessimistic write lock on the event row. Requests for the same event are serialized so capacity, duplicate checks, and seat counts remain consistent. Separate events can be updated independently.
+- Cancellation reads the booking after obtaining the event lock, preventing concurrent cancellations from freeing one seat twice.
+- Date/time fields use ISO local date-time values without offsets, interpreted in the server's local timezone. Future-date validation applies at event creation, as specified by the assessment.
+- H2 and its console are enabled for local assessment use. There is no authentication layer in this assignment.
+- Pagination has a small, explicit response DTO so clients do not depend on Spring Data internals.
+
+## Verification
+
+`clean verify` runs the service unit tests, application startup test, and HTTP integration tests. Coverage includes all six operations, 400/404 responses, validation, exact-email duplicates, pagination, Swagger schemas, automatic close/reopen behavior, and concurrent booking/cancellation requests against H2.
